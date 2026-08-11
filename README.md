@@ -58,6 +58,7 @@ Top-level keys:
 | `agent_timeout` | `600` | Hard subprocess timeout, in seconds |
 | `default_agent` | `"claude"` | Agent used when the request's `model` field doesn't match a configured agent |
 | `session_window` | `300` | Follow-ups within this many seconds resume the previous session; `0` disables session continuity |
+| `prompt_prefix` | `""` | Prepended to the user text (separated by a blank line) before it's sent to the agent; empty disables it |
 
 Per-agent fields (under `[agents.<name>]`):
 

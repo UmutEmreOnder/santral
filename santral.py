@@ -21,6 +21,7 @@ DEFAULTS = {
     "agent_timeout": 600,
     "default_agent": "claude",
     "session_window": 300,
+    "prompt_prefix": "",
 }
 
 BUILTIN_AGENTS = {
@@ -209,8 +210,12 @@ def make_handler(cfg, tracker):
             name = model if model in cfg["agents"] else cfg["default_agent"]
             agent = cfg["agents"][name]
 
+            prompt = user_text
+            if cfg["prompt_prefix"]:
+                prompt = cfg["prompt_prefix"] + "\n\n" + user_text
+
             resume, session_id = tracker.begin(name, "resume_command" in agent)
-            argv, stdin_input = build_argv(agent, resume, user_text, session_id)
+            argv, stdin_input = build_argv(agent, resume, prompt, session_id)
 
             done = threading.Event()
             result = {}

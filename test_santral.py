@@ -27,6 +27,7 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(cfg["agent_timeout"], 600)
         self.assertEqual(cfg["default_agent"], "claude")
         self.assertEqual(cfg["session_window"], 300)
+        self.assertEqual(cfg["prompt_prefix"], "")
         self.assertEqual(set(cfg["agents"]), {"claude", "codex", "gemini"})
         self.assertEqual(cfg["agents"]["claude"]["command"][:2], ["claude", "-p"])
 
@@ -36,6 +37,11 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(cfg["port"], 9999)
         self.assertEqual(cfg["session_window"], 60)
         self.assertEqual(cfg["sync_wait"], 25)  # untouched default
+
+    def test_prompt_prefix_override(self):
+        path = self._write('prompt_prefix = "Transcribed speech follows."\n')
+        cfg = santral.load_config(path)
+        self.assertEqual(cfg["prompt_prefix"], "Transcribed speech follows.")
 
     def test_agent_per_field_merge(self):
         path = self._write('[agents.claude]\nmodel = "opus"\n')
@@ -315,6 +321,14 @@ class TestChatCompletions(unittest.TestCase):
         ]}
         _, body = _post(self.port, payload)
         self.assertEqual(body["choices"][0]["message"]["content"], "second")
+
+    def test_prompt_prefix_prepended(self):
+        cfg = _base_cfg(sync_wait=2, default_agent="echo", prompt_prefix="PREFIX")
+        cfg["agents"]["echo"] = {"command": ["cat"]}
+        port = _start_server(self, cfg)
+        _, body = _post(port, _chat("echo", "hello santral"))
+        self.assertEqual(body["choices"][0]["message"]["content"],
+                          "PREFIX\n\nhello santral")
 
     def test_unknown_model_routes_to_default(self):
         _, body = _post(self.port, _chat("gpt-4o", "fallback test"))

@@ -7,6 +7,7 @@
 #default_agent = "claude"
 #session_window = 300  # follow-ups within this many seconds resume the last
                        # session; 0 disables session continuity
+#prompt_prefix = "The following is transcribed speech from a dictation app. Clean up disfluencies mentally. Execute the instruction and output ONLY the final result — no meta-commentary, no questions, no preamble; the output is pasted verbatim into the user's focused window."
 
 # Agents merge per-field over the built-ins (claude, codex, gemini):
 # fields you set here override, everything else is inherited.
