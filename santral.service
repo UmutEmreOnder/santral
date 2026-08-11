@@ -1,0 +1,11 @@
+[Unit]
+Description=Santral - OpenAI-compatible bridge to local CLI agents
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/santral.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

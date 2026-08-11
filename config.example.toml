@@ -1,0 +1,32 @@
+# Santral configuration — copy to ~/.config/santral/config.toml
+# Every key is optional; omitted keys keep their built-in defaults.
+
+#port = 8765
+#sync_wait = 25        # seconds to wait before answering with an ack and going async
+#agent_timeout = 600   # hard subprocess timeout, seconds
+#default_agent = "claude"
+#session_window = 300  # follow-ups within this many seconds resume the last
+                       # session; 0 disables session continuity
+
+# Agents merge per-field over the built-ins (claude, codex, gemini):
+# fields you set here override, everything else is inherited.
+# Placeholders: {prompt} (substituted, else prompt is piped to stdin),
+# {session_id}, and {model}/{effort} inside *_args templates.
+
+#[agents.claude]
+#model = "opus"          # appended as: --model opus
+#effort = "high"         # appended as: --effort high
+
+#[agents.codex]
+#model = "gpt-5-codex"   # appended as: -m gpt-5-codex
+#effort = "high"         # appended as: -c model_reasoning_effort=high
+
+# Full command override (must restate the whole template):
+#[agents.claude]
+#command        = ["claude", "-p", "--permission-mode", "acceptEdits", "--session-id", "{session_id}"]
+#resume_command = ["claude", "-p", "--permission-mode", "acceptEdits", "--resume", "{session_id}"]
+
+# Custom agent:
+#[agents.myagent]
+#command    = ["my-agent", "--ask", "{prompt}"]
+#model_args = ["--model", "{model}"]
