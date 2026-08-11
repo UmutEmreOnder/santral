@@ -122,6 +122,23 @@ def notify(title, body):
         print(f"[notify] {title}: {body}")
 
 
+def copy_to_clipboard(text):
+    for argv in (["wl-copy"], ["xclip", "-selection", "clipboard"]):
+        try:
+            # wl-copy/xclip fork a child that holds the clipboard and keeps
+            # inherited pipes open; capturing output would block until the
+            # clipboard is replaced, so send it to DEVNULL instead.
+            proc = subprocess.run(argv, input=text, text=True,
+                                  stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL,
+                                  timeout=10)
+            if proc.returncode == 0:
+                return True
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+    return False
+
+
 def run_agent(cfg, name, argv, stdin_input, tracker, session_id, done, result):
     try:
         proc = subprocess.run(argv, input=stdin_input, capture_output=True,
@@ -137,7 +154,11 @@ def run_agent(cfg, name, argv, stdin_input, tracker, session_id, done, result):
     result["text"] = out
     done.set()
     if result.get("backgrounded"):
-        notify(f"{name} finished", out)
+        if copy_to_clipboard(out):
+            notify("Agent finished",
+                   f"{name} finished its job, you can paste the result.")
+        else:
+            notify("Agent finished", out)
 
 
 def make_handler(cfg, tracker):
@@ -229,7 +250,7 @@ def make_handler(cfg, tracker):
             else:
                 result["backgrounded"] = True
                 text = (f"{name} is running in the background; "
-                        "the result will arrive as a notification.")
+                        "the result will be copied to your clipboard when ready.")
 
             if req.get("stream"):
                 self._sse(name, text)

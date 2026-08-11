@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -203,13 +204,31 @@ class TestRunAgent(unittest.TestCase):
         done, result = _run(cfg, "fake", ["sleep", "5"], None)
         self.assertIn("timed out", result["text"])
 
-    def test_backgrounded_run_notifies(self):
+    def test_backgrounded_run_copies_to_clipboard(self):
         calls = []
-        orig = santral.notify
+        clipboard = []
+        orig_notify = santral.notify
+        orig_copy = santral.copy_to_clipboard
         santral.notify = lambda title, body: calls.append((title, body))
-        self.addCleanup(setattr, santral, "notify", orig)
+        santral.copy_to_clipboard = lambda text: (clipboard.append(text) or True)
+        self.addCleanup(setattr, santral, "notify", orig_notify)
+        self.addCleanup(setattr, santral, "copy_to_clipboard", orig_copy)
         _run(self.CFG, "fake", ["cat"], "late answer", backgrounded=True)
-        self.assertEqual(calls, [("fake finished", "late answer")])
+        self.assertEqual(
+            calls,
+            [("Agent finished", "fake finished its job, you can paste the result.")])
+        self.assertEqual(clipboard, ["late answer"])
+
+    def test_backgrounded_run_falls_back_when_clipboard_unavailable(self):
+        calls = []
+        orig_notify = santral.notify
+        orig_copy = santral.copy_to_clipboard
+        santral.notify = lambda title, body: calls.append((title, body))
+        santral.copy_to_clipboard = lambda text: False
+        self.addCleanup(setattr, santral, "notify", orig_notify)
+        self.addCleanup(setattr, santral, "copy_to_clipboard", orig_copy)
+        _run(self.CFG, "fake", ["cat"], "late answer", backgrounded=True)
+        self.assertEqual(calls, [("Agent finished", "late answer")])
 
     def test_marks_session_finished(self):
         tracker = santral.SessionTracker(window=300)
@@ -228,6 +247,60 @@ class TestRunAgent(unittest.TestCase):
         done, result = _run(self.CFG, "fake", [f.name], None)
         self.assertTrue(done.is_set())
         self.assertIn("failed", result["text"])
+
+
+class TestCopyToClipboard(unittest.TestCase):
+    def test_uses_wl_copy_when_available(self):
+        calls = []
+
+        def fake_run(argv, input, text, timeout, **kwargs):
+            calls.append((argv, input))
+            return subprocess.CompletedProcess(argv, 0)
+
+        orig = santral.subprocess.run
+        santral.subprocess.run = fake_run
+        self.addCleanup(setattr, santral.subprocess, "run", orig)
+        self.assertTrue(santral.copy_to_clipboard("hello"))
+        self.assertEqual(calls, [(["wl-copy"], "hello")])
+
+    def test_falls_back_to_xclip_when_wl_copy_missing(self):
+        calls = []
+
+        def fake_run(argv, input, text, timeout, **kwargs):
+            calls.append(argv)
+            if argv[0] == "wl-copy":
+                raise FileNotFoundError
+            return subprocess.CompletedProcess(argv, 0)
+
+        orig = santral.subprocess.run
+        santral.subprocess.run = fake_run
+        self.addCleanup(setattr, santral.subprocess, "run", orig)
+        self.assertTrue(santral.copy_to_clipboard("hello"))
+        self.assertEqual(calls, [["wl-copy"], ["xclip", "-selection", "clipboard"]])
+
+    def test_falls_back_to_xclip_when_wl_copy_exits_nonzero(self):
+        calls = []
+
+        def fake_run(argv, input, text, timeout, **kwargs):
+            calls.append(argv)
+            if argv[0] == "wl-copy":
+                return subprocess.CompletedProcess(argv, 1)
+            return subprocess.CompletedProcess(argv, 0)
+
+        orig = santral.subprocess.run
+        santral.subprocess.run = fake_run
+        self.addCleanup(setattr, santral.subprocess, "run", orig)
+        self.assertTrue(santral.copy_to_clipboard("hello"))
+        self.assertEqual(calls, [["wl-copy"], ["xclip", "-selection", "clipboard"]])
+
+    def test_returns_false_when_no_tool_available(self):
+        def fake_run(argv, input, text, timeout, **kwargs):
+            raise FileNotFoundError
+
+        orig = santral.subprocess.run
+        santral.subprocess.run = fake_run
+        self.addCleanup(setattr, santral.subprocess, "run", orig)
+        self.assertFalse(santral.copy_to_clipboard("hello"))
 
 
 def _start_server(test, cfg):

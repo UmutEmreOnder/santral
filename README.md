@@ -4,12 +4,13 @@ Point any OpenAI-compatible app at your local CLI agents (Claude Code, Codex, Ge
 
 ## How it works
 
-Santral serves an OpenAI-compatible `/v1/chat/completions` endpoint on `127.0.0.1:8765`. The request's `model` field picks which CLI agent handles the prompt (`claude`, `codex`, `gemini`, or any custom agent you've configured). If the agent answers within `sync_wait` seconds (25 by default), the HTTP response carries the answer directly. If it's still running past that point, Santral replies immediately with an acknowledgement and keeps the agent running in the background; when it finishes, the result is delivered via `notify-send`. Follow-up requests sent within `session_window` seconds (300 by default) of the previous one resume the same CLI session instead of starting fresh, so multi-turn conversations keep their context.
+Santral serves an OpenAI-compatible `/v1/chat/completions` endpoint on `127.0.0.1:8765`. The request's `model` field picks which CLI agent handles the prompt (`claude`, `codex`, `gemini`, or any custom agent you've configured). If the agent answers within `sync_wait` seconds (25 by default), the HTTP response carries the answer directly. If it's still running past that point, Santral replies immediately with an acknowledgement and keeps the agent running in the background; when it finishes, the result is copied to the clipboard and a `notify-send` notification announces it (falls back to showing the result in the notification if no clipboard tool is available). Follow-up requests sent within `session_window` seconds (300 by default) of the previous one resume the same CLI session instead of starting fresh, so multi-turn conversations keep their context.
 
 ## Requirements
 
 - Python 3.11+ (uses `tomllib` from the standard library)
 - Linux: desktop notifications use `notify-send`; if it isn't installed, background results are printed to stdout instead
+- Optional: `wl-clipboard` (or `xclip`) so background results are delivered via the clipboard instead of stuffed into the notification body
 - At least one agent CLI installed and on `PATH` (`claude`, `codex`, `gemini`, or your own)
 
 ## Quickstart
