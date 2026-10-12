@@ -1,17 +1,17 @@
 # Santral
 
-Point any OpenAI-compatible app at your local CLI agents (Claude Code, Codex, Gemini CLI, ...).
+Point any OpenAI-compatible app at your local CLI agents (Claude Code, Codex, Gemini CLI, OMP, ...).
 
 ## How it works
 
-Santral serves an OpenAI-compatible `/v1/chat/completions` endpoint on `127.0.0.1:8765`. The request's `model` field picks which CLI agent handles the prompt (`claude`, `codex`, `gemini`, or any custom agent you've configured). If the agent answers within `sync_wait` seconds (25 by default), the HTTP response carries the answer directly. If it's still running past that point, Santral replies immediately with an acknowledgement and keeps the agent running in the background; when it finishes, the result is copied to the clipboard and a `notify-send` notification announces it (falls back to showing the result in the notification if no clipboard tool is available). Follow-up requests sent within `session_window` seconds (300 by default) of the previous one resume the same CLI session instead of starting fresh, so multi-turn conversations keep their context.
+Santral serves an OpenAI-compatible `/v1/chat/completions` endpoint on `127.0.0.1:8765`. The request's `model` field picks which CLI agent handles the prompt (`claude`, `codex`, `gemini`, `omp`, or any custom agent you've configured). If the agent answers within `sync_wait` seconds (25 by default), the HTTP response carries the answer directly. If it's still running past that point, Santral replies immediately with an acknowledgement and keeps the agent running in the background; when it finishes, the result is copied to the clipboard and a `notify-send` notification announces it (falls back to showing the result in the notification if no clipboard tool is available). Follow-up requests sent within `session_window` seconds (300 by default) of the previous one resum…
 
 ## Requirements
 
 - Python 3.11+ (uses `tomllib` from the standard library)
 - Linux: desktop notifications use `notify-send`; if it isn't installed, background results are printed to stdout instead
 - Optional: `wl-clipboard` (or `xclip`) so background results are delivered via the clipboard instead of stuffed into the notification body
-- At least one agent CLI installed and on `PATH` (`claude`, `codex`, `gemini`, or your own)
+- At least one agent CLI installed and on `PATH` (`claude`, `codex`, `gemini`, `omp`, or your own)
 
 ## Quickstart
 
@@ -36,17 +36,17 @@ cp santral.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now santral
 ```
 
-systemd user services don't inherit your login shell's `PATH`, so agent CLIs installed outside the default service path (e.g. `claude` in `~/.local/bin`) will fail with "CLI not found" even though they work in your terminal. Add a drop-in extending the path:
+systemd user services don't inherit your login shell's `PATH`, so agent CLIs installed outside the default service path (e.g. `claude` in `~/.local/bin`, `omp` in `~/.bun/bin`) will fail with "CLI not found" even though they work in your terminal. Add a drop-in extending the path:
 
 ```bash
 mkdir -p ~/.config/systemd/user/santral.service.d
-printf '[Service]\nEnvironment=PATH=%%h/.local/bin:/usr/local/bin:/usr/bin:/bin\n' > ~/.config/systemd/user/santral.service.d/path.conf
+printf '[Service]\nEnvironment=PATH=%%h/.local/bin:%%h/.bun/bin:/usr/local/bin:/usr/bin:/bin\n' > ~/.config/systemd/user/santral.service.d/path.conf
 systemctl --user daemon-reload && systemctl --user restart santral
 ```
 
 ## Configuration
 
-Santral reads `~/.config/santral/config.toml` if it exists; every key is optional and falls back to a built-in default. Use `config.example.toml` in this repo as a starting point: copy it to `~/.config/santral/config.toml` and uncomment what you need. Agent definitions merge per-field over the three built-ins (`claude`, `codex`, `gemini`): any field you set overrides the built-in, everything else is inherited unchanged.
+Santral reads `~/.config/santral/config.toml` if it exists; every key is optional and falls back to a built-in default. Use `config.example.toml` in this repo as a starting point: copy it to `~/.config/santral/config.toml` and uncomment what you need. Agent definitions merge per-field over the four built-ins (`claude`, `codex`, `gemini`, `omp`): any field you set overrides the built-in, everything else is inherited unchanged.
 
 Top-level keys:
 
@@ -84,14 +84,16 @@ Placeholders available in argv templates:
 | `claude` | `claude -p --session-id {session_id}` | `claude -p --resume {session_id}` | `--model {model}` | `--effort {effort}` |
 | `codex` | `codex exec -` (prompt on stdin) | `codex exec resume --last -` | `-m {model}` | `-c model_reasoning_effort={effort}` |
 | `gemini` | `gemini -p {prompt}` | `gemini --resume latest -p {prompt}` | `-m {model}` | not supported |
+| `omp` | `omp -p --model @task --approval-mode yolo --no-title {prompt}` | `omp -p -c --model @task --approval-mode yolo --no-title {prompt}` | not supported (pinned to `@task`) | `--thinking {effort}` |
 
 ## Example client: OpenWhispr
 
-In OpenWhispr, set the dictation agent's self-hosted endpoint to `http://127.0.0.1:8765` and pick one of your configured agent names (e.g. `claude`, `codex`, `gemini`) in the model field. Requests dictated through OpenWhispr will be routed to that CLI agent exactly like the curl example above.
+In OpenWhispr, set the dictation agent's self-hosted endpoint to `http://127.0.0.1:8765` and pick one of your configured agent names (e.g. `claude`, `codex`, `gemini`, `omp`) in the model field. Requests dictated through OpenWhispr will be routed to that CLI agent exactly like the curl example above.
 
 ## Caveats
 
 - Only the latest user message is forwarded to the agent; Santral does not resend prior conversation history. Multi-turn continuity relies entirely on the underlying CLI's own session resume.
-- For `codex` and `gemini`, "resume" targets the CLI's *most recent* recorded session, not necessarily one Santral started; if you've used the same CLI manually in a terminal in the meantime, a follow-up request may resume that session instead.
+- For `codex`, `gemini`, and `omp`, "resume" targets the CLI's *most recent* recorded session, not necessarily one Santral started; if you've used the same CLI manually in a terminal in the meantime, a follow-up request may resume that session instead.
 - Session memory is kept in-process. Restarting Santral forgets which sessions are still "warm," so the next request for each agent starts a fresh session.
 - There is no authentication. Santral binds to `127.0.0.1` only and is meant to be reached from the local machine.
+- `omp` always runs as the general-purpose `task` agent in `--approval-mode yolo` (no approval prompts, full tool access); there's no config knob to change that short of a full `command`/`resume_command` override.

@@ -9,7 +9,7 @@
                        # session; 0 disables session continuity
 #prompt_prefix = "The following is transcribed speech from a dictation app. Clean up disfluencies mentally. Execute the instruction and output ONLY the final result — no meta-commentary, no questions, no preamble; the output is pasted verbatim into the user's focused window."
 
-# Agents merge per-field over the built-ins (claude, codex, gemini):
+# Agents merge per-field over the built-ins (claude, codex, gemini, omp):
 # fields you set here override, everything else is inherited.
 # Placeholders: {prompt} (substituted, else prompt is piped to stdin),
 # {session_id}, and {model}/{effort} inside *_args templates.
@@ -21,6 +21,9 @@
 #[agents.codex]
 #model = "gpt-5-codex"   # appended as: -m gpt-5-codex
 #effort = "high"         # appended as: -c model_reasoning_effort=high
+
+#[agents.omp]
+#effort = "high"         # appended as: --thinking high
 
 # Full command override (must restate the whole template):
 #[agents.claude]

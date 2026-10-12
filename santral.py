@@ -44,6 +44,17 @@ BUILTIN_AGENTS = {
         "resume_command": ["gemini", "--resume", "latest", "-p", "{prompt}"],
         "model_args": ["-m", "{model}"],
     },
+    "omp": {
+        # "--model @task" pins the general-purpose task-agent persona;
+        # "--approval-mode yolo" runs it fully autonomous, no approval
+        # prompts. Resume targets omp's most recent recorded session, so
+        # no session id is needed.
+        "command": ["omp", "-p", "--model", "@task", "--approval-mode", "yolo",
+                    "--no-title", "{prompt}"],
+        "resume_command": ["omp", "-p", "-c", "--model", "@task",
+                            "--approval-mode", "yolo", "--no-title", "{prompt}"],
+        "effort_args": ["--thinking", "{effort}"],
+    },
 }
 
 CONFIG_PATH = Path.home() / ".config" / "santral" / "config.toml"

@@ -29,7 +29,7 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(cfg["default_agent"], "claude")
         self.assertEqual(cfg["session_window"], 300)
         self.assertEqual(cfg["prompt_prefix"], "")
-        self.assertEqual(set(cfg["agents"]), {"claude", "codex", "gemini"})
+        self.assertEqual(set(cfg["agents"]), {"claude", "codex", "gemini", "omp"})
         self.assertEqual(cfg["agents"]["claude"]["command"][:2], ["claude", "-p"])
 
     def test_top_level_override(self):
@@ -108,6 +108,27 @@ class TestBuildArgv(unittest.TestCase):
         agent = {"command": ["gemini", "-p", "{prompt}"], "model_args": ["-m", "{model}"]}
         argv, _ = santral.build_argv(agent, False, "x", "SID")
         self.assertEqual(argv, ["gemini", "-p", "x"])
+
+    def test_omp_builtin_yolo_and_task_agent(self):
+        agent = santral.BUILTIN_AGENTS["omp"]
+        argv, stdin_input = santral.build_argv(agent, False, "hello", "SID")
+        self.assertEqual(argv, ["omp", "-p", "--model", "@task",
+                                "--approval-mode", "yolo", "--no-title", "hello"])
+        self.assertIsNone(stdin_input)
+        self.assertIn("--approval-mode", argv)
+        self.assertEqual(argv[argv.index("--approval-mode") + 1], "yolo")
+
+    def test_omp_resume_keeps_yolo_and_task_agent(self):
+        agent = dict(santral.BUILTIN_AGENTS["omp"])
+        argv, _ = santral.build_argv(agent, True, "hello", "SID")
+        self.assertEqual(argv, ["omp", "-p", "-c", "--model", "@task",
+                                "--approval-mode", "yolo", "--no-title", "hello"])
+
+    def test_omp_effort_maps_to_thinking_flag(self):
+        agent = dict(santral.BUILTIN_AGENTS["omp"])
+        agent["effort"] = "high"
+        argv, _ = santral.build_argv(agent, False, "hello", "SID")
+        self.assertEqual(argv[-2:], ["--thinking", "high"])
 
 
 import time
@@ -333,9 +354,9 @@ class TestGetEndpoints(unittest.TestCase):
         status, body = _get(self.port, "/v1/models")
         self.assertEqual(status, 200)
         self.assertEqual(sorted(m["id"] for m in body["data"]),
-                         ["claude", "codex", "gemini"])
+                         ["claude", "codex", "gemini", "omp"])
         self.assertEqual(sorted(m["name"] for m in body["models"]),
-                         ["claude", "codex", "gemini"])
+                         ["claude", "codex", "gemini", "omp"])
 
     def test_api_tags_and_root_also_list(self):
         for path in ("/api/tags", "/"):
